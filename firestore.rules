@@ -1,0 +1,135 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: evaluations
+    // Document ID: auto-generated
+    // Fields:
+    //   - type: string (required, 'evaluation')
+    //   - teacher_id: string (optional)
+    //   - teacher_name: string (required, 1-100 chars)
+    //   - subject_id: string (optional)
+    //   - subject: string (required, 1-100 chars)
+    //   - period: string (optional, 0-50 chars)
+    //   - date: string (required, YYYY-MM-DD format)
+    //   - term: string (required, 1-10 chars)
+    //   - academic_year: string (required, 1-10 chars)
+    //   - evaluator_id: string (optional)
+    //   - evaluator: string (required, 1-100 chars)
+    //   - scores: map (required, keys are criteria IDs, values are numbers 1-5)
+    //   - suggestion: string (optional, 0-1000 chars)
+    //   - attachment_url: string (optional, URL format)
+    //   - status: string (required, 'completed')
+    //   - author_uid: string (required, matches auth.uid)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.author_uid;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "frissit6@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidEmail(email) {
+      return email is string &&
+        email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidUrl(url) {
+      return url is string &&
+        (url.matches("^https://.*") || url.matches("^http://.*") || url == "");
+    }
+
+    function isValidDateString(dateStr) {
+      return dateStr is string &&
+        dateStr.matches("^\\d{4}-\\d{2}-\\d{2}$");
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidEvaluation(data) {
+      let requiredFields = [
+        'type', 'teacher_name', 'subject', 'date', 'term', 
+        'academic_year', 'evaluator', 'scores', 'status', 'author_uid'
+      ];
+      let allowedFields = [
+        'type', 'teacher_id', 'teacher_name', 'subject_id', 'subject', 
+        'period', 'date', 'term', 'academic_year', 'evaluator_id', 
+        'evaluator', 'scores', 'suggestion', 'attachment_url', 'status', 'author_uid'
+      ];
+
+      return hasRequiredFields(requiredFields) &&
+             hasOnlyAllowedFields(allowedFields) &&
+             data.type == 'evaluation' &&
+             data.teacher_name is string && data.teacher_name.size() > 0 && data.teacher_name.size() <= 100 &&
+             data.subject is string && data.subject.size() > 0 && data.subject.size() <= 100 &&
+             isValidDateString(data.date) &&
+             data.term is string && data.term.size() > 0 && data.term.size() <= 10 &&
+             data.academic_year is string && data.academic_year.size() > 0 && data.academic_year.size() <= 10 &&
+             data.evaluator is string && data.evaluator.size() > 0 && data.evaluator.size() <= 100 &&
+             data.scores is map &&
+             data.status == 'completed' &&
+             data.author_uid == request.auth.uid &&
+             isValidUrl(data.attachment_url) &&
+             (data.suggestion is string && data.suggestion.size() <= 1000);
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create, update: if isAdmin();
+    }
+
+    match /evaluations/{evaluationId} {
+      // Allow all authenticated users to read evaluations (as per current app logic)
+      // But only owners or admins can delete
+      allow read: if isAuthenticated();
+      
+      allow create: if isAuthenticated() && isValidEvaluation(request.resource.data);
+      
+      allow update: if isAuthenticated() && 
+                      isValidEvaluation(request.resource.data) && 
+                      (isDocOwner() || isAdmin()) &&
+                      request.resource.data.author_uid == resource.data.author_uid; // author_uid is immutable
+      
+      allow delete: if isAdmin() || isDocOwner();
+    }
+
+    // Default deny
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}

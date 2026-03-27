@@ -1,0 +1,96 @@
+{
+  "entities": {
+    "Evaluation": {
+      "title": "Evaluation Record",
+      "description": "A record of a teaching evaluation.",
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "The type of record, usually 'evaluation'."
+        },
+        "teacher_id": {
+          "type": "string",
+          "description": "The ID of the teacher being evaluated."
+        },
+        "teacher_name": {
+          "type": "string",
+          "description": "The name of the teacher being evaluated."
+        },
+        "subject_id": {
+          "type": "string",
+          "description": "The ID of the subject being taught."
+        },
+        "subject": {
+          "type": "string",
+          "description": "The name of the subject being taught."
+        },
+        "period": {
+          "type": "string",
+          "description": "The teaching period or hour."
+        },
+        "date": {
+          "type": "string",
+          "format": "date",
+          "description": "The date of the evaluation (YYYY-MM-DD)."
+        },
+        "term": {
+          "type": "string",
+          "description": "The academic term."
+        },
+        "academic_year": {
+          "type": "string",
+          "description": "The academic year."
+        },
+        "evaluator_id": {
+          "type": "string",
+          "description": "The ID of the evaluator."
+        },
+        "evaluator": {
+          "type": "string",
+          "description": "The name of the evaluator."
+        },
+        "scores": {
+          "type": "object",
+          "description": "A map of criteria IDs to scores (1-5)."
+        },
+        "suggestion": {
+          "type": "string",
+          "description": "Developmental suggestions."
+        },
+        "attachment_url": {
+          "type": "string",
+          "format": "uri",
+          "description": "URL to an attached image or document."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["completed"],
+          "description": "The status of the evaluation."
+        },
+        "author_uid": {
+          "type": "string",
+          "description": "The UID of the user who created the record."
+        }
+      },
+      "required": [
+        "type",
+        "teacher_name",
+        "subject",
+        "date",
+        "term",
+        "academic_year",
+        "evaluator",
+        "scores",
+        "status",
+        "author_uid"
+      ]
+    }
+  },
+  "firestore": {
+    "/evaluations/{evaluationId}": {
+      "schema": "Evaluation",
+      "description": "Collection of evaluation records."
+    }
+  }
+}
